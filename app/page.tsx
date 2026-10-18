@@ -1,9 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { triggerSkyBoost } from "@/lib/scrollStore";
+import { onVisibilityChange, startMusic } from "@/lib/audio";
 import ProgressNav from "@/components/ui/ProgressNav";
+import MusicToggle from "@/components/ui/MusicToggle";
 import HeroSection from "@/components/sections/HeroSection";
 import WishesSection from "@/components/sections/WishesSection";
 import ConstellationSection from "@/components/sections/ConstellationSection";
@@ -28,10 +30,42 @@ export default function Home() {
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   }, []);
 
+  // Background music: browsers block audible autoplay before a gesture,
+  // so try immediately and otherwise start on the first tap / keypress.
+  useEffect(() => {
+    let done = false;
+    const kick = () => {
+      void startMusic().then((ok) => {
+        if (ok) {
+          done = true;
+          window.removeEventListener("pointerdown", kick);
+          window.removeEventListener("keydown", kick);
+        }
+      });
+    };
+    void startMusic().then((ok) => {
+      if (ok) {
+        done = true;
+        return;
+      }
+      window.addEventListener("pointerdown", kick);
+      window.addEventListener("keydown", kick);
+    });
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (!done) {
+        window.removeEventListener("pointerdown", kick);
+        window.removeEventListener("keydown", kick);
+      }
+    };
+  }, []);
+
   return (
     <div className="relative min-h-dvh bg-midnight font-sans text-ivory">
       <SkyExperience />
       <ProgressNav />
+      <MusicToggle />
       <main className="relative z-10">
         <HeroSection onExplore={explore} />
         {/* key remount = a fresh journey when the user restarts */}
